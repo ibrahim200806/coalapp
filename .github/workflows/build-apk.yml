@@ -38,10 +38,7 @@ jobs:
         working-directory: coalgov-mobile
         run: npx cap sync android
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Build Debug APK
+      - name: Build Debug APK with Gradle
         working-directory: coalgov-mobile/android
         run: |
           chmod +x ./gradlew
