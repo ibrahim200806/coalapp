@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CoalGov AI</string>
+    <string name="title_activity_main">CoalGov AI</string>
+    <string name="package_name">gov.coal.compliance</string>
+    <string name="custom_url_scheme">gov.coal.compliance</string>
+</resources>
