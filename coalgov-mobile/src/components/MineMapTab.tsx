@@ -1,13 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 import { MineSite } from '../types';
 import L from 'leaflet';
-import { MapPin, AlertTriangle, Layers, Crosshair, Shield } from 'lucide-react';
+import { MapPin, Crosshair } from 'lucide-react';
 
 interface MineMapTabProps {
   currentMine: MineSite;
+  theme?: 'dark' | 'light';
 }
 
-export const MineMapTab: React.FC<MineMapTabProps> = ({ currentMine }) => {
+export const MineMapTab: React.FC<MineMapTabProps> = ({ currentMine, theme = 'dark' }) => {
+  const isDark = theme === 'dark';
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
 
@@ -129,22 +131,32 @@ export const MineMapTab: React.FC<MineMapTabProps> = ({ currentMine }) => {
   };
 
   return (
-    <div className="pb-24 pt-2 px-3.5 space-y-3 max-w-lg mx-auto">
+    <div className="pb-28 pt-2 px-3.5 space-y-3 max-w-lg mx-auto">
       {/* Title */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center justify-between">
+      <div className={`border rounded-2xl p-4 shadow-sm flex items-center justify-between transition-colors ${
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+      }`}>
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+          <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500">
             <MapPin className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white">{currentMine.name} GIS Pit Map</h2>
-            <p className="text-[10px] text-slate-400">DGMS Geo-Spatial Hazard Tracking</p>
+            <h2 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {currentMine.name} GIS Pit Map
+            </h2>
+            <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              Geo-Spatial Open-Cast Hazard & Asset Tracking
+            </p>
           </div>
         </div>
 
         <button
           onClick={handleRecenter}
-          className="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-700"
+          className={`p-2 rounded-xl border transition ${
+            isDark
+              ? 'bg-slate-800 text-slate-300 hover:text-amber-400 border-slate-700'
+              : 'bg-slate-100 text-slate-700 hover:text-amber-600 border-slate-300'
+          }`}
           title="Recenter Map"
         >
           <Crosshair className="w-4 h-4" />
@@ -152,25 +164,29 @@ export const MineMapTab: React.FC<MineMapTabProps> = ({ currentMine }) => {
       </div>
 
       {/* Map Container */}
-      <div className="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl h-[420px] bg-slate-950">
+      <div className="relative rounded-2xl overflow-hidden border border-slate-700 shadow-2xl h-[420px] bg-slate-950">
         <div ref={mapContainerRef} className="w-full h-full" />
 
         {/* Legend Overlay */}
-        <div className="absolute top-2 left-2 z-[400] bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-xl p-2.5 shadow-lg text-[10px] space-y-1">
-          <span className="font-bold text-slate-300 block mb-1 uppercase tracking-wider">
-            Pit Map Legend
+        <div className={`absolute top-2 left-2 z-[400] backdrop-blur-md border rounded-xl p-2.5 shadow-lg text-[10px] space-y-1 ${
+          isDark ? 'bg-slate-900/90 border-slate-800 text-slate-300' : 'bg-white/95 border-slate-200 text-slate-900 shadow-md'
+        }`}>
+          <span className={`font-bold block mb-1 uppercase tracking-wider ${
+            isDark ? 'text-slate-300' : 'text-slate-800'
+          }`}>
+            Pit Safety Legend
           </span>
-          <div className="flex items-center gap-1.5 text-rose-400">
-            <span className="w-2 h-2 rounded-full bg-rose-500" /> Critical Hazard
+          <div className="flex items-center gap-1.5 text-rose-600 font-bold">
+            <span className="w-2 h-2 rounded-full bg-rose-500" /> Highwall Crack Hazard
           </div>
-          <div className="flex items-center gap-1.5 text-amber-400">
-            <span className="w-2 h-2 rounded-full bg-amber-500" /> Haul Road Issue
+          <div className="flex items-center gap-1.5 text-amber-600 font-bold">
+            <span className="w-2 h-2 rounded-full bg-amber-500" /> Haul Road Berm Defect
           </div>
-          <div className="flex items-center gap-1.5 text-sky-400">
-            <span className="w-2 h-2 rounded-full bg-sky-400" /> AAQMS Dust Sensor
+          <div className="flex items-center gap-1.5 text-sky-600 font-bold">
+            <span className="w-2 h-2 rounded-full bg-sky-500" /> AAQMS Dust Sensor
           </div>
-          <div className="flex items-center gap-1.5 text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" /> Muster Point
+          <div className="flex items-center gap-1.5 text-emerald-600 font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" /> Muster Point & First Aid
           </div>
         </div>
       </div>

@@ -1,4 +1,14 @@
-import { InspectionRecord, CAPAAction, StatutoryDocument, SyncQueueItem, UserProfile } from '../types';
+import {
+  InspectionRecord,
+  CAPAAction,
+  StatutoryDocument,
+  SyncQueueItem,
+  UserProfile,
+  ContractorEntity,
+  AuditLogEntry,
+  EmergencyAlert,
+  MineSite,
+} from '../types';
 
 const STORAGE_KEYS = {
   USER_PROFILE: 'coalgov_user_profile',
@@ -6,11 +16,24 @@ const STORAGE_KEYS = {
   INSPECTIONS: 'coalgov_inspections',
   CAPA_ACTIONS: 'coalgov_capa_actions',
   DOCUMENTS: 'coalgov_documents',
+  CONTRACTORS: 'coalgov_contractors',
+  AUDIT_LOGS: 'coalgov_audit_logs',
+  EMERGENCY_ALERTS: 'coalgov_emergency_alerts',
   SYNC_QUEUE: 'coalgov_sync_queue',
   SIMULATED_OFFLINE: 'coalgov_simulated_offline',
+  THEME: 'coalgov_theme',
 };
 
 export class StorageService {
+  // Theme support
+  static getTheme(): 'dark' | 'light' {
+    return (localStorage.getItem(STORAGE_KEYS.THEME) as 'dark' | 'light') || 'dark';
+  }
+
+  static setTheme(theme: 'dark' | 'light'): void {
+    localStorage.setItem(STORAGE_KEYS.THEME, theme);
+  }
+
   // Offline simulation toggle
   static isSimulatedOffline(): boolean {
     return localStorage.getItem(STORAGE_KEYS.SIMULATED_OFFLINE) === 'true';
@@ -42,6 +65,7 @@ export class StorageService {
       badgeNumber: 'DGMS-INSP-2024',
       assignedMineId: 'mine-kusmunda',
       assignedZone: 'Pit 4 - North Wall',
+      designation: 'Senior Field Compliance Inspector',
     };
     this.saveUserProfile(defaultUser);
     return defaultUser;
@@ -75,6 +99,22 @@ export class StorageService {
       list.unshift(record);
     }
     localStorage.setItem(STORAGE_KEYS.INSPECTIONS, JSON.stringify(list));
+
+    // Append to audit log
+    this.appendAuditLog({
+      id: `LOG-0x${Math.random().toString(16).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      actor: record.inspectorName,
+      role: 'FIELD_OFFICER',
+      action: 'INSPECTION_RECORDED',
+      targetEntity: record.id,
+      details: `Field inspection in ${record.zone}. ${record.failedChecks} failure(s) detected.`,
+      blockHash: `0x${Math.random().toString(16).slice(2, 10)}${Date.now().toString(16)}`,
+      previousHash: '0x8f2c91b8a4f009e4d1c998319fbc41235b6a718c39e08821a8c909e12891bb24',
+      verified: true,
+      ipAddress: '192.168.61.240',
+      geoStamp: record.items.find((i) => i.photoMetadata)?.photoMetadata?.stampedText,
+    });
 
     // If offline or marked as draft/saved_offline, add to sync queue
     if (record.status === 'SAVED_OFFLINE' || !this.isNetworkAvailable()) {
@@ -143,6 +183,71 @@ export class StorageService {
     });
   }
 
+  // Contractors
+  static getContractors(): ContractorEntity[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.CONTRACTORS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  static saveContractor(contractor: ContractorEntity): void {
+    const list = this.getContractors();
+    const idx = list.findIndex((c) => c.id === contractor.id);
+    if (idx >= 0) {
+      list[idx] = contractor;
+    } else {
+      list.push(contractor);
+    }
+    localStorage.setItem(STORAGE_KEYS.CONTRACTORS, JSON.stringify(list));
+  }
+
+  // Audit Logs
+  static getAuditLogs(): AuditLogEntry[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  static appendAuditLog(entry: AuditLogEntry): void {
+    const logs = this.getAuditLogs();
+    logs.unshift(entry);
+    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs.slice(0, 50)));
+  }
+
+  // Emergency Alerts (SOS)
+  static getEmergencyAlerts(): EmergencyAlert[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.EMERGENCY_ALERTS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  static triggerEmergencyAlert(alert: EmergencyAlert): void {
+    const list = this.getEmergencyAlerts();
+    list.unshift(alert);
+    localStorage.setItem(STORAGE_KEYS.EMERGENCY_ALERTS, JSON.stringify(list));
+
+    this.appendAuditLog({
+      id: `LOG-0x${Math.random().toString(16).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      actor: alert.triggeredBy,
+      role: 'FIELD_OFFICER',
+      action: 'EMERGENCY_SOS_BROADCAST',
+      targetEntity: alert.id,
+      details: `CRITICAL ALERT: ${alert.type} in ${alert.zone}. Evacuation to ${alert.evacuationMusterPoint}.`,
+      blockHash: `0x${Math.random().toString(16).slice(2, 10)}${Date.now().toString(16)}`,
+      previousHash: '0x2a991823bb9900c9e198234ab88912ef39c18274a10892c9081a98bc19280a91',
+      verified: true,
+      ipAddress: '192.168.61.240',
+      geoStamp: `${alert.coordinates[0]}° N, ${alert.coordinates[1]}° E`,
+    });
+  }
+
+  static resolveEmergencyAlert(alertId: string): void {
+    const list = this.getEmergencyAlerts();
+    const alert = list.find((a) => a.id === alertId);
+    if (alert) {
+      alert.active = false;
+      localStorage.setItem(STORAGE_KEYS.EMERGENCY_ALERTS, JSON.stringify(list));
+    }
+  }
+
   // Sync Queue
   static getSyncQueue(): SyncQueueItem[] {
     const raw = localStorage.getItem(STORAGE_KEYS.SYNC_QUEUE);
@@ -159,31 +264,82 @@ export class StorageService {
     localStorage.setItem(STORAGE_KEYS.SYNC_QUEUE, JSON.stringify([]));
   }
 
-  static updateSyncItemStatus(id: string, status: SyncQueueItem['status'], error?: string): void {
-    const queue = this.getSyncQueue();
-    const item = queue.find((q) => q.id === id);
-    if (item) {
-      item.status = status;
-      if (error) item.error = error;
-      localStorage.setItem(STORAGE_KEYS.SYNC_QUEUE, JSON.stringify(queue));
-    }
-  }
-
-  // Initialize seed data if storage is empty
+  // Seed Data Initializer
   static initSeedDataIfEmpty(
-    seedMines: any,
+    seedMines: MineSite[],
     seedInspections: InspectionRecord[],
     seedCapa: CAPAAction[],
-    seedDocs: StatutoryDocument[]
+    seedDocs: StatutoryDocument[],
+    seedContractors: ContractorEntity[],
+    seedLogs: AuditLogEntry[],
+    seedAlerts: EmergencyAlert[]
   ): void {
     if (!localStorage.getItem(STORAGE_KEYS.INSPECTIONS)) {
       localStorage.setItem(STORAGE_KEYS.INSPECTIONS, JSON.stringify(seedInspections));
+    } else {
+      try {
+        const stored: InspectionRecord[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.INSPECTIONS) || '[]');
+        let modified = false;
+        stored.forEach((insp) => {
+          const matchingSeed = seedInspections.find((s) => s.id === insp.id);
+          if (matchingSeed) {
+            insp.items.forEach((item) => {
+              const seedItem = matchingSeed.items.find((si) => si.id === item.id);
+              if (seedItem && seedItem.photoUrl && !item.photoUrl) {
+                item.photoUrl = seedItem.photoUrl;
+                item.photoMetadata = seedItem.photoMetadata;
+                modified = true;
+              }
+            });
+          }
+        });
+        if (modified) {
+          localStorage.setItem(STORAGE_KEYS.INSPECTIONS, JSON.stringify(stored));
+        }
+      } catch (e) {
+        localStorage.setItem(STORAGE_KEYS.INSPECTIONS, JSON.stringify(seedInspections));
+      }
     }
+
     if (!localStorage.getItem(STORAGE_KEYS.CAPA_ACTIONS)) {
       localStorage.setItem(STORAGE_KEYS.CAPA_ACTIONS, JSON.stringify(seedCapa));
+    } else {
+      try {
+        const storedCapa: CAPAAction[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CAPA_ACTIONS) || '[]');
+        let modifiedCapa = false;
+        storedCapa.forEach((capa) => {
+          const matchingSeed = seedCapa.find((s) => s.id === capa.id);
+          if (matchingSeed) {
+            if (matchingSeed.initialEvidencePhoto && !capa.initialEvidencePhoto) {
+              capa.initialEvidencePhoto = matchingSeed.initialEvidencePhoto;
+              modifiedCapa = true;
+            }
+            if (matchingSeed.closureProofPhoto && !capa.closureProofPhoto) {
+              capa.closureProofPhoto = matchingSeed.closureProofPhoto;
+              capa.closureProofMetadata = matchingSeed.closureProofMetadata;
+              modifiedCapa = true;
+            }
+          }
+        });
+        if (modifiedCapa) {
+          localStorage.setItem(STORAGE_KEYS.CAPA_ACTIONS, JSON.stringify(storedCapa));
+        }
+      } catch (e) {
+        localStorage.setItem(STORAGE_KEYS.CAPA_ACTIONS, JSON.stringify(seedCapa));
+      }
     }
+
     if (!localStorage.getItem(STORAGE_KEYS.DOCUMENTS)) {
       localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(seedDocs));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.CONTRACTORS)) {
+      localStorage.setItem(STORAGE_KEYS.CONTRACTORS, JSON.stringify(seedContractors));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS)) {
+      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(seedLogs));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.EMERGENCY_ALERTS)) {
+      localStorage.setItem(STORAGE_KEYS.EMERGENCY_ALERTS, JSON.stringify(seedAlerts));
     }
   }
 }

@@ -1,31 +1,96 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
-/* Mobile Specific Optimizations */
+/* Base styles */
 html, body, #root {
-  height: 100%;
+  min-height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #090d16;
-  color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+/* Dark Theme */
+body.dark, #root.dark {
+  background-color: #070a11;
+  color: #f1f5f9;
+  color-scheme: dark;
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+
+body.dark select,
+body.dark select option,
+body.dark input,
+body.dark textarea {
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+body.dark select option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* Light Theme */
+body.light, #root.light {
+  background-color: #f8fafc;
+  color: #0f172a;
+  color-scheme: light;
+}
+
+body.light select,
+body.light select option,
+body.light input,
+body.light textarea {
+  background-color: #ffffff;
+  color: #0f172a !important;
+  border-color: #cbd5e1;
+}
+
+body.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Dropdown styling */
+select {
+  cursor: pointer;
+}
+select option {
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
   border-radius: 4px;
 }
 
-/* High contrast rugged styling for outdoor pit inspection */
+/* Safe areas for mobile devices */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
 .safe-area-top {
   padding-top: env(safe-area-inset-top, 16px);
+}
+
+/* Print styling for DGMS Statutory Reports */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }

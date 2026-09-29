@@ -22,6 +22,7 @@ interface InspectTabProps {
   userProfile: UserProfile;
   isOffline: boolean;
   onInspectionCreated: (newRecord: InspectionRecord) => void;
+  theme?: 'dark' | 'light';
 }
 
 const ZONES = [
@@ -38,7 +39,9 @@ export const InspectTab: React.FC<InspectTabProps> = ({
   userProfile,
   isOffline,
   onInspectionCreated,
+  theme = 'dark',
 }) => {
+  const isDark = theme === 'dark';
   const [selectedZone, setSelectedZone] = useState(ZONES[0]);
   const [items, setItems] = useState<ChecklistItem[]>(
     JSON.parse(JSON.stringify(INITIAL_CHECKLIST_TEMPLATES))
@@ -99,77 +102,93 @@ export const InspectTab: React.FC<InspectTabProps> = ({
       criticalIssuesFound: criticalIssues,
       status: shouldSaveOffline ? 'SAVED_OFFLINE' : 'SYNCED',
       syncedAt: shouldSaveOffline ? undefined : now.toISOString(),
+      overallComments: overallNotes || 'Field statutory checklist completed according to CMR 2017 norms.',
       items,
-      overallComments: overallNotes,
     };
 
     StorageService.saveInspection(record);
 
-    // If failed checks occurred, also auto-create CAPA actions
-    items
-      .filter((i) => i.status === 'FAIL')
-      .forEach((failed) => {
+    // Auto-create CAPAs for failed critical checks with photo evidence
+    items.forEach((item) => {
+      if (item.status === 'FAIL') {
         StorageService.saveCapaAction({
-          id: `CAPA-${Math.floor(1000 + Math.random() * 9000)}`,
+          id: `CAPA-${Date.now().toString().slice(-5)}-${Math.floor(Math.random() * 900 + 100)}`,
           inspectionId: record.id,
           mineId: currentMine.id,
           zone: selectedZone,
-          title: `Rectify: ${failed.title}`,
-          description: failed.observationNotes || failed.description,
-          violationType: failed.category,
-          severity: failed.severityIfFailed,
-          assignedTo: 'Designated Pit Safety Supervisor',
-          dueDate: new Date(Date.now() + 86400000 * (failed.severityIfFailed === 'CRITICAL' ? 1 : 3)).toISOString(),
+          statutoryRule: item.statutoryRule,
+          violationCategory: item.category,
+          severity: item.severityIfFailed,
+          title: `Rectify: ${item.title}`,
+          description: item.observationNotes || item.description,
+          initialEvidencePhoto: item.photoUrl,
+          assignedTo: 'Dilip Buildcon Pit Safety Lead',
+          assignedRole: 'CONTRACTOR_SAFETY_SUPERVISOR',
+          dueDate: new Date(Date.now() + 86400000 * 2).toISOString(),
           status: 'OPEN',
-          initialEvidencePhoto: failed.photoUrl,
-          createdAt: now.toISOString(),
+          reportedAt: now.toISOString(),
+          reportedBy: userProfile.name,
         });
-      });
+      }
+    });
 
+    // Reset form
     setTimeout(() => {
       setIsSubmitting(false);
       setSuccessMessage(
         shouldSaveOffline
-          ? 'Saved to Local Device Offline Queue! Will auto-sync when cellular returns.'
-          : 'Inspection Synced & Distributed to Central Compliance Engine!'
+          ? '💾 Inspection stored in local encrypted database. Will sync when back in network.'
+          : '🚀 Field inspection uploaded to DGMS cloud and Colliery Manager ledger!'
       );
-      onInspectionCreated(record);
-
-      // Reset form
       setItems(JSON.parse(JSON.stringify(INITIAL_CHECKLIST_TEMPLATES)));
       setOverallNotes('');
+      onInspectionCreated(record);
     }, 600);
   };
 
   return (
-    <div className="pb-24 pt-2 px-3.5 space-y-4 max-w-lg mx-auto">
-      {/* Title & Zone Selector */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
+    <div className="pb-28 pt-2 px-3.5 space-y-4 max-w-lg mx-auto">
+      {/* Title & Inspector Metadata Card */}
+      <div className={`border rounded-2xl p-4 shadow-sm space-y-3 transition-colors ${
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+      }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500">
               <ClipboardCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Statutory Field Inspection</h2>
-              <p className="text-[10px] text-slate-400">DGMS Mine Safety & Compliance Protocol</p>
+              <h2 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                Statutory Field Inspection
+              </h2>
+              <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                DGMS Mine Safety & Compliance Protocol (CMR 2017)
+              </p>
             </div>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-amber-300">
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${
+            isDark ? 'bg-slate-800 text-amber-300 border-slate-700' : 'bg-amber-100 text-amber-900 border-amber-300'
+          }`}>
             {userProfile.badgeNumber}
           </span>
         </div>
 
         {/* Zone Selector */}
         <div>
-          <label className="text-[11px] font-medium text-slate-300 block mb-1">
+          <label className={`text-[11px] font-semibold block mb-1 ${
+            isDark ? 'text-slate-300' : 'text-slate-700'
+          }`}>
             Inspection Zone / Pit Section:
           </label>
           <div className="relative">
             <select
               value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-medium appearance-none focus:outline-none focus:border-amber-500"
+              className={`w-full border rounded-xl px-3 py-2 text-xs font-bold appearance-none focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors ${
+                isDark
+                  ? 'bg-slate-950 border-slate-700 text-slate-100'
+                  : 'bg-white border-slate-300 text-slate-900 shadow-sm'
+              }`}
             >
               {ZONES.map((z) => (
                 <option key={z} value={z}>
@@ -177,19 +196,27 @@ export const InspectTab: React.FC<InspectTabProps> = ({
                 </option>
               ))}
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+            <ChevronDown className={`w-4 h-4 absolute right-3 top-2.5 pointer-events-none ${
+              isDark ? 'text-slate-400' : 'text-slate-600'
+            }`} />
           </div>
         </div>
 
         {/* Progress summary banner */}
-        <div className="flex items-center justify-between bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 text-xs">
+        <div className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-colors ${
+          isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+        }`}>
           <div className="flex items-center gap-3">
-            <span className="text-emerald-400 font-mono font-bold">{passedChecks} PASS</span>
-            <span className="text-rose-400 font-mono font-bold">{failedChecks} FAIL</span>
+            <span className="text-emerald-600 font-mono font-bold">{passedChecks} PASS</span>
+            <span className="text-rose-600 font-mono font-bold">{failedChecks} FAIL</span>
           </div>
-          {criticalIssues > 0 && (
-            <span className="text-rose-400 text-[10px] font-bold bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800 animate-pulse">
+          {criticalIssues > 0 ? (
+            <span className="text-rose-600 text-[10px] font-bold bg-rose-100 px-2 py-0.5 rounded border border-rose-300 animate-pulse">
               ⚠️ {criticalIssues} CRITICAL
+            </span>
+          ) : (
+            <span className={`text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              {totalChecks - passedChecks - failedChecks} Pending
             </span>
           )}
         </div>
@@ -197,13 +224,13 @@ export const InspectTab: React.FC<InspectTabProps> = ({
 
       {/* Success Notification */}
       {successMessage && (
-        <div className="p-3 rounded-xl bg-emerald-950/90 border border-emerald-700 text-emerald-200 text-xs flex items-start gap-2 shadow-lg">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+        <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs flex items-start gap-2 shadow-sm animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-semibold">{successMessage}</p>
+            <p className="font-bold">{successMessage}</p>
             <button
               onClick={() => setSuccessMessage(null)}
-              className="text-[10px] text-emerald-400 underline mt-1 block"
+              className="text-[10px] text-emerald-700 font-bold underline mt-1 block"
             >
               Dismiss
             </button>
@@ -213,8 +240,10 @@ export const InspectTab: React.FC<InspectTabProps> = ({
 
       {/* Checklist items */}
       <div className="space-y-3">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-          DGMS Checklist Items ({items.length})
+        <h3 className={`text-xs font-bold uppercase tracking-wider px-1 ${
+          isDark ? 'text-slate-400' : 'text-slate-700'
+        }`}>
+          Statutory Checklist Items ({items.length})
         </h3>
 
         {items.map((item, index) => {
@@ -223,38 +252,48 @@ export const InspectTab: React.FC<InspectTabProps> = ({
               key={item.id}
               className={`p-3.5 rounded-2xl border transition-all ${
                 item.status === 'FAIL'
-                  ? 'bg-rose-950/30 border-rose-800/80'
+                  ? isDark ? 'bg-rose-950/30 border-rose-800/80' : 'bg-rose-50/90 border-rose-300 shadow-sm'
                   : item.status === 'PASS'
-                  ? 'bg-slate-900/90 border-emerald-800/40'
-                  : 'bg-slate-900/80 border-slate-800'
+                  ? isDark ? 'bg-slate-900/90 border-emerald-800/40' : 'bg-emerald-50/70 border-emerald-300 shadow-sm'
+                  : isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-800'
+                    }`}>
                       #{index + 1}
                     </span>
-                    <span className="text-[10px] text-amber-400 font-mono">
+                    <span className={`text-[10px] font-mono font-bold ${
+                      isDark ? 'text-amber-400' : 'text-amber-700'
+                    }`}>
                       {item.statutoryRule}
                     </span>
                   </div>
-                  <h4 className="text-xs font-bold text-slate-100 mt-1">{item.title}</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                  <h4 className={`text-xs font-bold mt-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                    {item.title}
+                  </h4>
+                  <p className={`text-[11px] mt-0.5 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                     {item.description}
                   </p>
                 </div>
               </div>
 
               {/* Status buttons */}
-              <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-800/80">
+              <div className={`flex items-center gap-2 mt-3 pt-2.5 border-t ${
+                isDark ? 'border-slate-800/80' : 'border-slate-200'
+              }`}>
                 <button
                   type="button"
                   onClick={() => handleStatusChange(item.id, 'PASS')}
                   className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition ${
                     item.status === 'PASS'
                       ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-900/40'
-                      : 'bg-slate-800/60 text-slate-400 border-slate-700/60 hover:text-slate-200'
+                      : isDark
+                        ? 'bg-slate-800/60 text-slate-400 border-slate-700/60 hover:text-slate-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> PASS
@@ -266,7 +305,9 @@ export const InspectTab: React.FC<InspectTabProps> = ({
                   className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition ${
                     item.status === 'FAIL'
                       ? 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-900/40'
-                      : 'bg-slate-800/60 text-slate-400 border-slate-700/60 hover:text-slate-200'
+                      : isDark
+                        ? 'bg-slate-800/60 text-slate-400 border-slate-700/60 hover:text-slate-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
                   }`}
                 >
                   <XCircle className="w-3.5 h-3.5" /> FAIL
@@ -277,27 +318,35 @@ export const InspectTab: React.FC<InspectTabProps> = ({
                   onClick={() => handleStatusChange(item.id, 'NA')}
                   className={`py-1.5 px-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border transition ${
                     item.status === 'NA'
-                      ? 'bg-slate-700 text-slate-200 border-slate-600'
-                      : 'bg-slate-800/60 text-slate-500 border-slate-700/60'
+                      ? isDark ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-slate-300 text-slate-900 border-slate-400 font-bold'
+                      : isDark ? 'bg-slate-800/60 text-slate-500 border-slate-700/60' : 'bg-slate-100 text-slate-500 border-slate-200'
                   }`}
                 >
                   <MinusCircle className="w-3.5 h-3.5" /> N/A
                 </button>
               </div>
 
-              {/* Observation & Evidence Capture Section (Shows when failed or when officer wants to attach proof) */}
+              {/* Observation & Evidence Capture Section */}
               {(item.status === 'FAIL' || item.photoUrl) && (
-                <div className="mt-3 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5 animate-fadeIn">
+                <div className={`mt-3 p-2.5 rounded-xl border space-y-2.5 animate-fadeIn ${
+                  isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-amber-50/70 border-amber-200'
+                }`}>
                   <div>
-                    <label className="text-[10px] font-bold text-amber-300 uppercase block mb-1">
+                    <label className={`text-[10px] font-bold uppercase block mb-1 ${
+                      isDark ? 'text-amber-300' : 'text-amber-900'
+                    }`}>
                       Observation Details & Immediate Hazard:
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Berm missing for 35m stretch, water ponding near haul ramp..."
+                      placeholder="e.g. Berm eroded 35m stretch, water ponding near ramp..."
                       value={item.observationNotes || ''}
                       onChange={(e) => handleNotesChange(item.id, e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors ${
+                        isDark
+                          ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-500'
+                          : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                      }`}
                     />
                   </div>
 
@@ -311,16 +360,16 @@ export const InspectTab: React.FC<InspectTabProps> = ({
                           className="w-14 h-14 object-cover rounded-lg border border-amber-500/60 shadow"
                         />
                         <div className="text-[10px]">
-                          <div className="text-emerald-400 font-bold flex items-center gap-1">
+                          <div className="text-emerald-600 font-bold flex items-center gap-1">
                             <Check className="w-3 h-3" /> Geo-Stamped Evidence
                           </div>
-                          <div className="text-slate-400 font-mono">
+                          <div className={`font-mono ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                             {item.photoMetadata?.latitude.toFixed(4)}°, {item.photoMetadata?.longitude.toFixed(4)}°
                           </div>
                           <button
                             type="button"
                             onClick={() => setActiveItemForCamera(item.id)}
-                            className="text-amber-400 underline mt-0.5"
+                            className="text-amber-600 font-bold underline mt-0.5"
                           >
                             Retake Photo
                           </button>
@@ -330,9 +379,13 @@ export const InspectTab: React.FC<InspectTabProps> = ({
                       <button
                         type="button"
                         onClick={() => setActiveItemForCamera(item.id)}
-                        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold hover:bg-amber-500/25 active:scale-98 transition"
+                        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold active:scale-98 transition ${
+                          isDark
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                            : 'bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-200'
+                        }`}
                       >
-                        <Camera className="w-4 h-4 text-amber-400" />
+                        <Camera className="w-4 h-4 text-amber-600" />
                         Take Geo-Tagged Stamped Photo
                       </button>
                     )}
@@ -345,8 +398,10 @@ export const InspectTab: React.FC<InspectTabProps> = ({
       </div>
 
       {/* Overall Comments */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-2">
-        <label className="text-xs font-bold text-slate-300 block">
+      <div className={`border rounded-2xl p-3.5 space-y-2 transition-colors ${
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+      }`}>
+        <label className={`text-xs font-bold block ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>
           General Mine Shift Notes & Weather:
         </label>
         <textarea
@@ -354,7 +409,11 @@ export const InspectTab: React.FC<InspectTabProps> = ({
           value={overallNotes}
           onChange={(e) => setOverallNotes(e.target.value)}
           placeholder="Shift dry, high ambient dust, haul trucks operating at 20 km/h..."
-          className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          className={`w-full border rounded-xl p-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors ${
+            isDark
+              ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder-slate-500'
+              : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+          }`}
         />
       </div>
 
@@ -364,9 +423,13 @@ export const InspectTab: React.FC<InspectTabProps> = ({
           type="button"
           disabled={isSubmitting}
           onClick={() => handleSubmit(true)}
-          className="flex-1 py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-98 transition shadow"
+          className={`flex-1 py-3 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 active:scale-98 transition shadow-sm ${
+            isDark
+              ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+              : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
+          }`}
         >
-          <Save className="w-4 h-4 text-amber-400" />
+          <Save className="w-4 h-4 text-amber-500" />
           Save Offline
         </button>
 
@@ -374,10 +437,10 @@ export const InspectTab: React.FC<InspectTabProps> = ({
           type="button"
           disabled={isSubmitting}
           onClick={() => handleSubmit(false)}
-          className="flex-[2] py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-98 transition"
+          className="flex-[2] py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-98 transition"
         >
           <Send className="w-4 h-4" />
-          {isOffline ? 'Queue for Auto-Sync' : 'Submit & Broadcast to Central'}
+          {isOffline ? 'Queue for Auto-Sync' : 'Submit to Central Portal'}
         </button>
       </div>
 

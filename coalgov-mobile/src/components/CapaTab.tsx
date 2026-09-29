@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Calendar,
   ChevronRight,
+  X,
 } from 'lucide-react';
 
 interface CapaTabProps {
@@ -21,6 +22,7 @@ interface CapaTabProps {
   currentRole: UserRole;
   capaActions: CAPAAction[];
   onActionUpdated: () => void;
+  theme?: 'dark' | 'light';
 }
 
 export const CapaTab: React.FC<CapaTabProps> = ({
@@ -29,7 +31,9 @@ export const CapaTab: React.FC<CapaTabProps> = ({
   currentRole,
   capaActions,
   onActionUpdated,
+  theme = 'dark',
 }) => {
+  const isDark = theme === 'dark';
   const [filter, setFilter] = useState<'ALL' | 'OPEN' | 'PENDING_VERIFICATION' | 'CLOSED'>('ALL');
   const [selectedActionForClosure, setSelectedActionForClosure] = useState<CAPAAction | null>(null);
   const [closureNotes, setClosureNotes] = useState('');
@@ -87,161 +91,207 @@ export const CapaTab: React.FC<CapaTabProps> = ({
     onActionUpdated();
   };
 
+  const getSeverityBadge = (sev: string) => {
+    switch (sev) {
+      case 'CRITICAL':
+        return isDark
+          ? 'bg-rose-950 text-rose-300 border-rose-800'
+          : 'bg-rose-100 text-rose-900 border-rose-300 font-bold';
+      case 'HIGH':
+        return isDark
+          ? 'bg-amber-950 text-amber-300 border-amber-800'
+          : 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
+      default:
+        return isDark
+          ? 'bg-slate-800 text-slate-300 border-slate-700'
+          : 'bg-slate-200 text-slate-800 border-slate-300 font-bold';
+    }
+  };
+
   return (
-    <div className="pb-24 pt-2 px-3.5 space-y-4 max-w-lg mx-auto">
+    <div className="pb-28 pt-2 px-3.5 space-y-4 max-w-lg mx-auto">
       {/* Title */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center justify-between">
+      <div className={`border rounded-2xl p-4 shadow-sm flex items-center justify-between transition-colors ${
+        isDark ? 'bg-slate-900/90 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+      }`}>
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400">
+          <div className="p-2 rounded-xl bg-rose-500/20 text-rose-500">
             <ShieldAlert className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white">Corrective Actions (CAPA)</h2>
-            <p className="text-[10px] text-slate-400">Statutory Violation Closure Cycle</p>
+            <h2 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              Corrective Actions (CAPA)
+            </h2>
+            <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              Field Remediation & Proof Submission Workflow
+            </p>
           </div>
         </div>
-        <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-slate-800 text-amber-400 border border-slate-700">
-          {filtered.length} Total
+        <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full border ${
+          isDark ? 'bg-slate-800 text-amber-400 border-slate-700' : 'bg-amber-100 text-amber-900 border-amber-300'
+        }`}>
+          {capaActions.filter((c) => c.status !== 'CLOSED').length} Active
         </span>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-        {(['ALL', 'OPEN', 'PENDING_VERIFICATION', 'CLOSED'] as const).map((tab) => (
+      {/* Filter Chips */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        {[
+          { key: 'ALL', label: 'All Actions' },
+          { key: 'OPEN', label: 'Open / In-Pit' },
+          { key: 'PENDING_VERIFICATION', label: 'Pending Manager' },
+          { key: 'CLOSED', label: 'Resolved' },
+        ].map((f) => (
           <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
-              filter === tab
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200'
+            key={f.key}
+            onClick={() => setFilter(f.key as any)}
+            className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition text-xs ${
+              filter === f.key
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : isDark
+                  ? 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  : 'bg-white text-slate-700 hover:text-slate-900 border border-slate-200'
             }`}
           >
-            {tab === 'PENDING_VERIFICATION' ? 'VERIFICATION' : tab}
+            {f.label}
           </button>
         ))}
       </div>
 
-      {/* Action Cards List */}
+      {/* CAPA Action Cards */}
       <div className="space-y-3">
+        {filtered.length === 0 && (
+          <div className={`p-8 text-center rounded-2xl border ${
+            isDark ? 'bg-slate-900/40 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
+          }`}>
+            <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
+            <p className="text-xs font-medium">No CAPA items under current filter.</p>
+          </div>
+        )}
+
         {filtered.map((action) => {
-          const isCritical = action.severity === 'CRITICAL';
-          const isOverdue =
-            (action.status === 'OPEN' || action.status === 'IN_PROGRESS') &&
-            new Date(action.dueDate) < new Date();
+          const isOverdue = new Date(action.dueDate).getTime() < Date.now() && action.status !== 'CLOSED';
 
           return (
             <div
               key={action.id}
-              className={`p-3.5 rounded-2xl border transition-all ${
+              className={`p-4 rounded-2xl border transition shadow-sm space-y-3 ${
                 action.status === 'CLOSED'
-                  ? 'bg-slate-900/70 border-emerald-900/40 opacity-80'
-                  : action.status === 'PENDING_VERIFICATION'
-                  ? 'bg-sky-950/30 border-sky-800/80 shadow-md shadow-sky-950/20'
-                  : isCritical
-                  ? 'bg-rose-950/30 border-rose-800/80 shadow-md shadow-rose-950/30'
-                  : 'bg-slate-900/90 border-slate-800'
+                  ? isDark ? 'bg-slate-900/40 border-slate-800 opacity-75' : 'bg-slate-50 border-slate-200 opacity-80'
+                  : isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
               }`}
             >
               {/* Header */}
               <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-200">
-                    {action.id}
-                  </span>
-                  <span
-                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                      isCritical
-                        ? 'bg-rose-600 text-white'
-                        : 'bg-amber-600/90 text-white'
-                    }`}
-                  >
-                    {action.severity}
-                  </span>
-                  {isOverdue && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700 animate-pulse">
-                      OVERDUE SLA
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${getSeverityBadge(action.severity)}`}>
+                      {action.severity}
                     </span>
-                  )}
+                    <span className={`text-[10px] font-mono ${isDark ? 'text-amber-400' : 'text-amber-800 font-bold'}`}>
+                      {action.statutoryRule}
+                    </span>
+                  </div>
+                  <h3 className={`text-xs font-bold leading-snug ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                    {action.title}
+                  </h3>
                 </div>
 
-                {/* Status Badge */}
+                {/* Status pill */}
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono ${
+                  className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 border ${
                     action.status === 'CLOSED'
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                      ? 'bg-emerald-600 text-white border-emerald-500'
                       : action.status === 'PENDING_VERIFICATION'
-                      ? 'bg-sky-950 text-sky-400 border border-sky-800 animate-pulse'
-                      : 'bg-amber-950 text-amber-400 border border-amber-800'
+                      ? 'bg-sky-600 text-white border-sky-500'
+                      : isOverdue
+                      ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
+                      : 'bg-amber-500 text-slate-950 font-black border-amber-400'
                   }`}
                 >
-                  {action.status.replace('_', ' ')}
+                  {action.status.replace(/_/g, ' ')}
                 </span>
               </div>
 
-              {/* Title & Description */}
-              <h4 className="text-xs font-bold text-slate-100 mt-2">{action.title}</h4>
-              <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+              {/* Description */}
+              <p className={`text-[11px] leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 {action.description}
               </p>
 
-              {/* Zone & Assigned To */}
-              <div className="mt-2.5 pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[10px] text-slate-400">
-                <div>
-                  <span className="text-slate-500 block">Location:</span>
-                  <span className="text-slate-300 font-medium">{action.zone}</span>
+              {/* Meta details */}
+              <div className={`p-2 rounded-xl text-[10px] space-y-1 border ${
+                isDark ? 'bg-slate-950/70 border-slate-800/80 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
+              }`}>
+                <div className="flex justify-between">
+                  <span>Assigned Agency:</span>
+                  <strong className={isDark ? 'text-slate-200' : 'text-slate-900'}>{action.assignedTo}</strong>
                 </div>
-                <div>
-                  <span className="text-slate-500 block">Assigned To:</span>
-                  <span className="text-slate-300 font-medium truncate block">
-                    {action.assignedTo}
+                <div className="flex justify-between">
+                  <span>Location:</span>
+                  <span className={isDark ? 'text-slate-200' : 'text-slate-900'}>{action.zone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Resolution SLA:</span>
+                  <span className={`font-mono font-bold ${isOverdue ? 'text-rose-600' : isDark ? 'text-slate-300' : 'text-slate-800'}`}>
+                    Due {new Date(action.dueDate).toLocaleDateString()} {isOverdue && '⚠️ OVERDUE'}
                   </span>
                 </div>
               </div>
 
-              {/* Proof photos if available */}
-              {(action.initialEvidencePhoto || action.closureProofPhoto) && (
-                <div className="flex gap-2 mt-3 pt-2 border-t border-slate-800/80">
-                  {action.initialEvidencePhoto && (
-                    <div className="text-center">
-                      <img
-                        src={action.initialEvidencePhoto}
-                        alt="Initial Defect"
-                        className="w-16 h-16 object-cover rounded-lg border border-rose-500/50"
-                      />
-                      <span className="text-[9px] text-rose-400 font-medium block mt-0.5">
-                        Defect Proof
+              {/* Photographic Evidence Gallery: Initial Violation vs Rectification Proof */}
+              <div className="space-y-2 pt-1">
+                {action.initialEvidencePhoto && (
+                  <div className={`p-2.5 rounded-xl border flex items-center gap-3 ${
+                    isDark ? 'bg-rose-950/20 border-rose-900/40' : 'bg-rose-50/70 border-rose-200'
+                  }`}>
+                    <img
+                      src={action.initialEvidencePhoto}
+                      alt="Hazard Evidence"
+                      className="w-16 h-16 object-cover rounded-lg border border-rose-500 shrink-0 shadow-sm"
+                    />
+                    <div className="text-[10px] space-y-0.5">
+                      <span className="text-rose-600 font-bold block">
+                        ⚠️ 1. Initial Hazard Evidence (Taken During Inspection)
                       </span>
+                      <p className={`line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Documented non-compliance awaiting physical repair by contractor.
+                      </p>
                     </div>
-                  )}
-                  {action.closureProofPhoto && (
-                    <div className="text-center">
-                      <img
-                        src={action.closureProofPhoto}
-                        alt="Closure Proof"
-                        className="w-16 h-16 object-cover rounded-lg border border-emerald-500/50"
-                      />
-                      <span className="text-[9px] text-emerald-400 font-medium block mt-0.5">
-                        Closure Proof
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
-              {/* Verification Info if closed */}
-              {action.status === 'CLOSED' && action.verifiedBy && (
-                <div className="mt-2.5 p-2 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-[10px] text-emerald-300 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>
-                    Verified & Closed by <strong>{action.verifiedBy}</strong> on{' '}
-                    {new Date(action.verifiedAt || '').toLocaleDateString()}
-                  </span>
-                </div>
-              )}
+                {action.closureProofPhoto && (
+                  <div className={`p-2.5 rounded-xl border flex items-center gap-3 ${
+                    isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-emerald-50/70 border-emerald-200'
+                  }`}>
+                    <img
+                      src={action.closureProofPhoto}
+                      alt="Proof of Closure"
+                      className="w-16 h-16 object-cover rounded-lg border border-emerald-500 shrink-0 shadow-sm"
+                    />
+                    <div className="text-[10px] space-y-0.5">
+                      <span className="text-emerald-600 font-bold block">
+                        ✓ 2. Rectification Evidence (Post-Repair Proof)
+                      </span>
+                      {action.closureProofMetadata && (
+                        <span className={`font-mono block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                          GPS: {action.closureProofMetadata.latitude.toFixed(4)}°, {action.closureProofMetadata.longitude.toFixed(4)}°
+                        </span>
+                      )}
+                      {action.closureNotes && (
+                        <p className={`line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          "{action.closureNotes}"
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Action Buttons */}
-              <div className="mt-3 flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className={`mt-2 flex items-center justify-end gap-2 pt-2 border-t ${
+                isDark ? 'border-slate-800' : 'border-slate-200'
+              }`}>
                 {/* Field Officer: Submit Proof of Closure */}
                 {action.status !== 'CLOSED' && action.status !== 'PENDING_VERIFICATION' && (
                   <button
@@ -249,17 +299,19 @@ export const CapaTab: React.FC<CapaTabProps> = ({
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold shadow-md hover:bg-amber-400 active:scale-95 transition"
                   >
                     <Camera className="w-3.5 h-3.5" />
-                    Submit Proof of Closure
+                    Submit Closure Proof
                   </button>
                 )}
 
-                {/* Mine Manager or Auditor Verification Sign-off */}
+                {/* Manager / Auditor Verification Sign-off */}
                 {action.status === 'PENDING_VERIFICATION' &&
                   (currentRole === 'MINE_MANAGER' || currentRole === 'REGULATORY_AUDITOR') && (
                     <div className="flex gap-2 w-full justify-end">
                       <button
                         onClick={() => handleManagerVerification(action, false)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-950 text-rose-300 border border-rose-800 text-xs font-bold hover:bg-rose-900"
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                          isDark ? 'bg-rose-950 text-rose-300 border-rose-800 hover:bg-rose-900' : 'bg-rose-100 text-rose-900 border-rose-300 hover:bg-rose-200'
+                        }`}
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Reject
                       </button>
@@ -273,8 +325,10 @@ export const CapaTab: React.FC<CapaTabProps> = ({
                   )}
 
                 {action.status === 'PENDING_VERIFICATION' && currentRole === 'FIELD_OFFICER' && (
-                  <span className="text-[11px] text-sky-400 font-medium flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Awaiting Manager Sign-Off
+                  <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                    isDark ? 'text-sky-400' : 'text-sky-700'
+                  }`}>
+                    <Clock className="w-3.5 h-3.5" /> Proof Submitted • Awaiting Manager Sign-Off
                   </span>
                 )}
               </div>
@@ -286,42 +340,49 @@ export const CapaTab: React.FC<CapaTabProps> = ({
       {/* Modal: Submit Proof of Closure */}
       {selectedActionForClosure && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-4 space-y-3.5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <h3 className="text-sm font-bold text-white">Submit Proof of Closure</h3>
+          <div className={`border rounded-2xl w-full max-w-md p-4 space-y-3.5 shadow-2xl transition-colors ${
+            isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-2 ${
+              isDark ? 'border-slate-800' : 'border-slate-200'
+            }`}>
+              <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                Submit Proof of Closure
+              </h3>
               <button
                 onClick={() => setSelectedActionForClosure(null)}
-                className="text-slate-400 hover:text-slate-200 text-xs"
+                className={`text-xs ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
               >
-                Cancel
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <div>
-              <span className="text-[10px] text-amber-400 font-mono font-bold">
+              <span className={`text-[10px] font-mono font-bold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
                 {selectedActionForClosure.id}
               </span>
-              <h4 className="text-xs font-bold text-slate-100">
+              <h4 className={`text-xs font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                 {selectedActionForClosure.title}
               </h4>
             </div>
 
             {/* Closure Evidence Photo Trigger */}
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+            <div className={`p-3 rounded-xl border text-center ${
+              isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
               {capturedProofPhoto ? (
                 <div className="space-y-2">
                   <img
                     src={capturedProofPhoto}
                     alt="Proof Preview"
-                    className="max-h-36 mx-auto rounded-lg border border-emerald-500/50"
+                    className="max-h-36 mx-auto rounded-lg border border-emerald-500 shadow"
                   />
-                  <div className="text-[10px] text-emerald-400 font-mono">
-                    ✓ Geo-stamped at {capturedProofMetadata?.latitude.toFixed(4)}°,{' '}
-                    {capturedProofMetadata?.longitude.toFixed(4)}°
+                  <div className="text-[10px] text-emerald-600 font-bold font-mono">
+                    ✓ Geo-stamped at {capturedProofMetadata?.latitude.toFixed(4)}°, {capturedProofMetadata?.longitude.toFixed(4)}°
                   </div>
                   <button
                     onClick={() => setIsCameraOpen(true)}
-                    className="text-xs text-amber-400 underline font-medium"
+                    className="text-xs text-amber-600 underline font-bold"
                   >
                     Retake Closure Photo
                   </button>
@@ -329,12 +390,16 @@ export const CapaTab: React.FC<CapaTabProps> = ({
               ) : (
                 <button
                   onClick={() => setIsCameraOpen(true)}
-                  className="w-full py-4 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-amber-500/40 rounded-xl hover:border-amber-500 text-amber-300"
+                  className={`w-full py-4 flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl transition ${
+                    isDark
+                      ? 'border-amber-500/40 text-amber-300 hover:border-amber-500'
+                      : 'border-amber-400 text-amber-900 hover:border-amber-600 bg-amber-50/50'
+                  }`}
                 >
-                  <Camera className="w-6 h-6 text-amber-400" />
+                  <Camera className="w-6 h-6 text-amber-500" />
                   <span className="text-xs font-bold">Take Geo-Tagged Proof Photo</span>
-                  <span className="text-[10px] text-slate-400">
-                    Proves berm reconstruction or machinery fix on-site
+                  <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Required proof of physical hazard elimination
                   </span>
                 </button>
               )}
@@ -342,7 +407,9 @@ export const CapaTab: React.FC<CapaTabProps> = ({
 
             {/* Closure Notes */}
             <div>
-              <label className="text-[11px] font-medium text-slate-300 block mb-1">
+              <label className={`text-[11px] font-semibold block mb-1 ${
+                isDark ? 'text-slate-300' : 'text-slate-700'
+              }`}>
                 Rectification Notes & Measurements:
               </label>
               <textarea
@@ -350,7 +417,11 @@ export const CapaTab: React.FC<CapaTabProps> = ({
                 value={closureNotes}
                 onChange={(e) => setClosureNotes(e.target.value)}
                 placeholder="e.g. Berm rebuilt to 2.4m height using compacted boulder clay over 40m length..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className={`w-full border rounded-xl p-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors ${
+                  isDark
+                    ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder-slate-500'
+                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                }`}
               />
             </div>
 
@@ -358,7 +429,7 @@ export const CapaTab: React.FC<CapaTabProps> = ({
             <button
               onClick={handleSubmitProof}
               disabled={!capturedProofPhoto}
-              className="w-full py-2.5 rounded-xl bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-lg shadow-amber-500/20 active:scale-98 transition flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 active:scale-98 transition flex items-center justify-center gap-1.5"
             >
               <Check className="w-4 h-4" />
               Submit for Manager Sign-off
